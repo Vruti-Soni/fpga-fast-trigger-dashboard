@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CERN Level-1 Trigger (L1T) FPGA Pipeline Emulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        fpga: {
+                            dark: '#030712',
+                            card: '#0b0f19',
+                            border: '#1f2937',
+                            amber: '#f59e0b',
+                            emerald: '#10b981',
+                            cyan: '#06b6d4',
+                            rose: '#f43f5e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(31, 41, 55, 0.8);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030712;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f2937;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f59e0b;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden select-none bg-fpga-dark">
+
+    <!-- TOP HEADER BAR -->
+    <header class="bg-fpga-card/90 backdrop-blur border-b border-fpga-border px-6 py-3 flex flex-wrap items-center justify-between z-20 gap-3 shadow-2xl">
+        <div class="flex items-center space-x-3">
+            <div class="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-500 shadow-lg shadow-amber-500/10">
+                <i class="fa-solid fa-microchip text-xl animate-pulse"></i>
+            </div>
+            <div>
+                <h1 class="text-sm md:text-base font-bold text-gray-100 tracking-wider uppercase flex items-center gap-2">
+                    CERN Level-1 Trigger (L1T) FPGA Pipeline Emulator
+                    <span class="text-[10px] bg-amber-950 text-amber-400 border border-amber-800/60 px-2 py-0.5 rounded-full font-mono font-normal">Xilinx Virtex UltraScale+</span>
+                </h1>
+                <p class="text-xs text-gray-400 font-mono">LHC Bunch Clock: 40.08 MHz (24.95 ns per Crossing) | 1.6 Gbps LVDS Serial Links</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 shadow-md">
+                <span class="w-2 h-2 mr-2 bg-emerald-500 rounded-full animate-ping"></span> FPGA PLL LOCKED
+            </span>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE CONTAINER -->
+    <div class="flex-1 flex flex-col md:flex-row relative overflow-hidden bg-fpga-dark">
+        
+        <!-- LEFT COLUMN: OSCILLOSCOPE & PIPELINE STAGES -->
+        <div class="flex-1 flex flex-col p-4 md:p-6 space-y-4 overflow-y-auto">
+            
+            <!-- LIVE TELEMETRY OSCILLOSCOPE PANEL -->
+            <div class="glass-panel rounded-2xl p-4 shadow-2xl flex flex-col space-y-3">
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-wave-square text-amber-400 text-sm"></i>
+                        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">Detector Pulse Telemetry & Discriminator</span>
+                    </div>
+                    <div id="telemetry-stats" class="text-xs font-mono bg-fpga-dark px-3 py-1 rounded-lg border border-fpga-border">
+                        Peak Amplitude: <span class="text-amber-400 font-bold">4.82 V</span> | Status: <span class="text-emerald-400 font-bold">L1_ACCEPT</span>
+                    </div>
+                </div>
+
+                <!-- OSCILLOSCOPE CANVAS -->
+                <div class="relative bg-gray-950 rounded-xl border border-fpga-border h-56 md:h-64 overflow-hidden shadow-inner">
+                    <canvas id="oscilloscope-canvas" class="w-full h-full block"></canvas>
+                    <div class="absolute top-2 left-3 text-[10px] font-mono text-gray-500 pointer-events-none">CH1: LVDS Analog Pulse (500 mV/div)</div>
+                    <div class="absolute bottom-2 left-3 text-[10px] font-mono text-amber-400/70 pointer-events-none">--- V_th Threshold Cut Line ---</div>
+                </div>
+            </div>
+
+            <!-- PIPELINE STAGES GRID -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <!-- STAGE 1 -->
+                <div class="glass-panel p-4 rounded-xl border border-fpga-border flex flex-col justify-between hover:border-indigo-500/50 transition duration-300">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase">Stage 1</span>
+                            <span class="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800 px-1.5 py-0.5 rounded font-mono">1.2 ns</span>
+                        </div>
+                        <div class="my-2 text-sm font-bold text-indigo-400 font-mono flex items-center space-x-2">
+                            <i class="fa-solid fa-diagram-project"></i>
+                            <span>SerDes Deserializer</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Latches 16-ch differential LVDS hit signals @ 1.6 Gbps serial rate.</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-fpga-border flex justify-between items-center text-[10px] font-mono">
+                        <span class="text-gray-500">Status:</span>
+                        <span class="text-indigo-400 font-bold">LATCHED</span>
+                    </div>
+                </div>
+
+                <!-- STAGE 2 -->
+                <div class="glass-panel p-4 rounded-xl border border-fpga-border flex flex-col justify-between hover:border-amber-500/50 transition duration-300">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase">Stage 2</span>
+                            <span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded font-mono">2.5 ns</span>
+                        </div>
+                        <div class="my-2 text-sm font-bold text-amber-400 font-mono flex items-center space-x-2">
+                            <i class="fa-solid fa-filter"></i>
+                            <span>DSP48E2 Slicer</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Evaluates peak pulse amplitude against programmable $p_T$ threshold $V_{th}$.</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-fpga-border flex justify-between items-center text-[10px] font-mono">
+                        <span class="text-gray-500">Discriminator:</span>
+                        <span id="stage2-status" class="text-emerald-400 font-bold">PASSED</span>
+                    </div>
+                </div>
+
+                <!-- STAGE 3 -->
+                <div class="glass-panel p-4 rounded-xl border border-fpga-border flex flex-col justify-between hover:border-cyan-500/50 transition duration-300">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase">Stage 3</span>
+                            <span class="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-1.5 py-0.5 rounded font-mono">3.1 ns</span>
+                        </div>
+                        <div class="my-2 text-sm font-bold text-cyan-400 font-mono flex items-center space-x-2">
+                            <i class="fa-solid fa-memory"></i>
+                            <span>BRAM LUT Match</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Look-Up Table (LUT) maps track coordinates against trigger topology templates.</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-fpga-border flex justify-between items-center text-[10px] font-mono">
+                        <span class="text-gray-500">Topology:</span>
+                        <span class="text-cyan-400 font-bold">MATCH_FOUND</span>
+                    </div>
+                </div>
+
+                <!-- STAGE 4 -->
+                <div class="glass-panel p-4 rounded-xl border border-fpga-border flex flex-col justify-between hover:border-emerald-500/50 transition duration-300">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400 font-mono uppercase">Stage 4</span>
+                            <span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded font-mono">0.8 ns</span>
+                        </div>
+                        <div class="my-2 text-sm font-bold text-emerald-400 font-mono flex items-center space-x-2">
+                            <i class="fa-solid fa-check-double"></i>
+                            <span>Decision Arbiter</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Asserts Level-1 Accept (L1A) strobe to front-end readout memory buffers.</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-fpga-border flex justify-between items-center text-[10px] font-mono">
+                        <span class="text-gray-500">Out Strobe:</span>
+                        <span id="stage4-status" class="text-emerald-400 font-bold">L1A_HIGH</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: HARDWARE CONTROLS & METRICS SIDEBAR -->
+        <div class="w-full md:w-80 glass-panel border-l border-fpga-border p-5 flex flex-col space-y-5 z-10 shadow-2xl">
+            
+            <div class="flex items-center justify-between border-b border-fpga-border pb-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-amber-400 text-sm"></i>
+                    <h2 class="text-xs font-bold text-gray-200 uppercase tracking-wider">Hardware Registers</h2>
+                </div>
+                <span class="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    SYS_CFG
+                </span>
+            </div>
+
+            <!-- CONTROLS -->
+            <div class="space-y-4 text-xs">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label for="slider-thresh" class="text-gray-300 font-medium">Trigger Threshold ($V_{th}$)</label>
+                        <span id="val-thresh" class="font-mono text-amber-400 font-bold">3.50 V</span>
+                    </div>
+                    <input id="slider-thresh" type="range" min="1.0" max="6.0" step="0.1" value="3.5" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-0.5">
+                        <span>Low Cut (1.0 V)</span>
+                        <span>High Cut (6.0 V)</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label for="slider-rate" class="text-gray-300 font-medium">Collision Bunch Crossing Rate</label>
+                        <span id="val-rate" class="font-mono text-cyan-400 font-bold">40 MHz</span>
+                    </div>
+                    <input id="slider-rate" type="range" min="10" max="40" step="5" value="40" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-0.5">
+                        <span>10 MHz</span>
+                        <span>40 MHz (LHC Std)</span>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-fpga-border">
+
+            <!-- METRICS PANEL -->
+            <div class="bg-fpga-dark/90 p-4 rounded-xl border border-fpga-border space-y-2.5 text-xs">
+                <div class="text-[10px] text-gray-400 font-mono font-bold uppercase tracking-wider">Telemetry Counters</div>
+                
+                <div class="flex justify-between font-mono bg-fpga-card p-2 rounded border border-gray-800/80">
+                    <span class="text-gray-400">Total Collisions:</span>
+                    <span id="metric-total" class="text-gray-200 font-bold">0</span>
+                </div>
+                
+                <div class="flex justify-between font-mono bg-fpga-card p-2 rounded border border-gray-800/80">
+                    <span class="text-gray-400">L1 Accepts (L1A):</span>
+                    <span id="metric-accept" class="text-emerald-400 font-bold">0</span>
+                </div>
+
+                <div class="flex justify-between font-mono bg-fpga-card p-2 rounded border border-gray-800/80">
+                    <span class="text-gray-400">Deadtime Loss:</span>
+                    <span class="text-amber-400 font-bold">0.00%</span>
+                </div>
+
+                <div class="flex justify-between font-mono bg-fpga-card p-2 rounded border border-gray-800/80">
+                    <span class="text-gray-400">Pipeline Latency:</span>
+                    <span class="text-indigo-400 font-bold">7.6 ns</span>
+                </div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="flex space-x-2 pt-2">
+                <button id="btn-toggle" onclick="toggleSimulation()" class="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-amber-600/25 flex items-center justify-center space-x-2">
+                    <i id="btn-icon" class="fa-solid fa-pause text-sm"></i>
+                    <span id="btn-text">Pause Stream</span>
+                </button>
+                <button onclick="resetCounters()" class="py-2 px-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold border border-gray-700 transition">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- APPLICATION SCRIPT -->
+    <script>
+        const canvas = document.getElementById('oscilloscope-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let isRunning = true;
+        let totalEvents = 0;
+        let totalAccepts = 0;
+        let threshold = 3.5;
+        let timeOffset = 0;
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Control Listeners
+        const sliderThresh = document.getElementById('slider-thresh');
+        const valThresh = document.getElementById('val-thresh');
+        sliderThresh.addEventListener('input', (e) => {
+            threshold = parseFloat(e.target.value);
+            valThresh.innerText = threshold.toFixed(2) + " V";
+        });
+
+        const sliderRate = document.getElementById('slider-rate');
+        const valRate = document.getElementById('val-rate');
+        sliderRate.addEventListener('input', (e) => {
+            valRate.innerText = e.target.value + " MHz";
+        });
+
+        function toggleSimulation() {
+            isRunning = !isRunning;
+            const btnText = document.getElementById('btn-text');
+            const btnIcon = document.getElementById('btn-icon');
+            const btnToggle = document.getElementById('btn-toggle');
+
+            if (isRunning) {
+                btnText.innerText = "Pause Stream";
+                btnIcon.className = "fa-solid fa-pause text-sm";
+                btnToggle.className = "flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-amber-600/25 flex items-center justify-center space-x-2";
+            } else {
+                btnText.innerText = "Resume Stream";
+                btnIcon.className = "fa-solid fa-play text-sm";
+                btnToggle.className = "flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-emerald-600/25 flex items-center justify-center space-x-2";
+            }
+        }
+
+        function resetCounters() {
+            totalEvents = 0;
+            totalAccepts = 0;
+            document.getElementById('metric-total').innerText = "0";
+            document.getElementById('metric-accept').innerText = "0";
+        }
+
+        function renderOscilloscope() {
+            ctx.fillStyle = '#030712';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Oscilloscope Grid Lines
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+            }
+            for (let y = 0; y < canvas.height; y += 30) {
+                ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+            }
+            ctx.stroke();
+
+            // Draw Threshold Voltage Line
+            const threshY = canvas.height - (threshold / 6.0) * canvas.height;
+            ctx.strokeStyle = '#f59e0b';
+            ctx.setLineDash([6, 6]);
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, threshY);
+            ctx.lineTo(canvas.width, threshY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Pulse Waveform
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            let peakVal = 0;
+            for (let x = 0; x < canvas.width; x++) {
+                let t = (x + timeOffset) * 0.05;
+                
+                // Simulate Gaussian detector hit pulses
+                let yVal = Math.sin(t * 0.4) * 0.4 + 
+                           Math.exp(-Math.pow((t % 40) - 20, 2) / 8) * 4.8 +
+                           Math.exp(-Math.pow((t % 85) - 42, 2) / 10) * 3.4 +
+                           (Math.random() - 0.5) * 0.15;
+                
+                if (x === Math.floor(canvas.width / 2)) peakVal = yVal;
+
+                let canvasY = canvas.height - (yVal / 6.0) * canvas.height;
+                if (x === 0) ctx.moveTo(x, canvasY);
+                else ctx.lineTo(x, canvasY);
+            }
+            ctx.stroke();
+
+            if (isRunning) {
+                timeOffset += 2;
+                totalEvents += 1;
+                
+                const isAccept = peakVal >= threshold;
+                if (isAccept) totalAccepts += 1;
+
+                document.getElementById('metric-total').innerText = totalEvents.toLocaleString();
+                document.getElementById('metric-accept').innerText = totalAccepts.toLocaleString();
+                
+                const statText = document.getElementById('telemetry-stats');
+                const stage2Status = document.getElementById('stage2-status');
+                const stage4Status = document.getElementById('stage4-status');
+
+                if (isAccept) {
+                    statText.innerHTML = `Peak Amplitude: <span class="text-amber-400 font-bold">${peakVal.toFixed(2)} V</span> | Status: <span class="text-emerald-400 font-bold">L1_ACCEPT</span>`;
+                    stage2Status.innerText = "PASSED";
+                    stage2Status.className = "text-emerald-400 font-bold";
+                    stage4Status.innerText = "L1A_HIGH";
+                    stage4Status.className = "text-emerald-400 font-bold";
+                } else {
+                    statText.innerHTML = `Peak Amplitude: <span class="text-gray-400 font-bold">${peakVal.toFixed(2)} V</span> | Status: <span class="text-rose-400 font-bold">REJECT</span>`;
+                    stage2Status.innerText = "CUT_BELOW_VTH";
+                    stage2Status.className = "text-rose-400 font-bold";
+                    stage4Status.innerText = "L1A_LOW";
+                    stage4Status.className = "text-rose-400 font-bold";
+                }
+            }
+
+            requestAnimationFrame(renderOscilloscope);
+        }
+
+        requestAnimationFrame(renderOscilloscope);
+    </script>
+</body>
+</html>
